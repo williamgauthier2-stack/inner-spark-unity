@@ -10,16 +10,18 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ddfcd7f15d1c2ba4c9fe0215478925bf, type: 3}
-  m_Name: Lvl1_Intro
+  m_Name: Lvl25_End
   m_EditorClassIdentifier: Assembly-CSharp::Pcb.DialogSequence
   lines:
   - speakerName: Sparkie
     portrait: {fileID: 10901, guid: 0000000000000000f000000000000000, type: 0}
-    text: Hello, I am Sparky, follow me in a journey to discover the unseen magic
-      of old machine!
+    text: 'We push old machines to the back of the closet, and we walk past the people
+      who quietly keep our world running. '
   - speakerName: Sparkie
     portrait: {fileID: 10901, guid: 0000000000000000f000000000000000, type: 0}
-    text: 'Wakie wakie, Granny! '
+    text: 'But being overlooked is not the same as being empty. Behind every dusty
+      shell and every tired face, an Inner Spark is still waiting. Take the time
+      to see it. '
   - speakerName: Sparkie
     portrait: {fileID: 10901, guid: 0000000000000000f000000000000000, type: 0}
-    text: Before you played games, your family made leather goods.
+    text: Thanks for playing!

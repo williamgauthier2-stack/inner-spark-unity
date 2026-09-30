@@ -10,16 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ddfcd7f15d1c2ba4c9fe0215478925bf, type: 3}
-  m_Name: Lvl1_Intro
+  m_Name: Lvl14_Intro
   m_EditorClassIdentifier: Assembly-CSharp::Pcb.DialogSequence
   lines:
   - speakerName: Sparkie
     portrait: {fileID: 10901, guid: 0000000000000000f000000000000000, type: 0}
-    text: Hello, I am Sparky, follow me in a journey to discover the unseen magic
-      of old machine!
+    text: 'NES could only draw 8 sprites on one line. '
   - speakerName: Sparkie
     portrait: {fileID: 10901, guid: 0000000000000000f000000000000000, type: 0}
-    text: 'Wakie wakie, Granny! '
-  - speakerName: Sparkie
-    portrait: {fileID: 10901, guid: 0000000000000000f000000000000000, type: 0}
-    text: Before you played games, your family made leather goods.
+    text: That's why characters flickered when the action got crowded!
