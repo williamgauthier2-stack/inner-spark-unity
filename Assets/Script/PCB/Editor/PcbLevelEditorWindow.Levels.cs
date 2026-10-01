@@ -42,7 +42,14 @@ public partial class PcbLevelEditorWindow
         if (string.IsNullOrEmpty(board.savedPath))
             EditorGUILayout.HelpBox("Not saved yet.", MessageType.Warning);
         else if (isDirtyCached)
-            EditorGUILayout.HelpBox($"Unsaved changes ({savedName}).", MessageType.Warning);
+        {
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                EditorGUILayout.HelpBox($"Unsaved changes ({savedName}).", MessageType.Warning);
+                if (GUILayout.Button(new GUIContent("Why?", "Logs to the Console what differs from the saved level."), GUILayout.Width(44), GUILayout.Height(38)))
+                    LogDifference();
+            }
+        }
         else
             EditorGUILayout.HelpBox($"Saved: {savedName}", MessageType.Info);
         if (!string.IsNullOrEmpty(savedName) && CleanName(board.levelName) != savedName)
@@ -146,6 +153,20 @@ public partial class PcbLevelEditorWindow
         }
         dirtyCheckDue = true;
         ShowNotification(new GUIContent($"Saved {levelName}"));
+        if (IsDirty()) LogDifference(); // just saved, so this would be a false "unsaved" warning: say why
+    }
+
+    /// <summary>Logs every entry that differs between the level being edited and its saved prefab.</summary>
+    void LogDifference()
+    {
+        var saved = string.IsNullOrEmpty(board.savedPath) ? null : AssetDatabase.LoadAssetAtPath<Board>(board.savedPath);
+        if (!saved) { Debug.Log("[PCB] This level hasn't been saved yet."); return; }
+        var current = new List<string>(Signature(board).Split('\n'));
+        var stored = new List<string>(Signature(saved).Split('\n'));
+        var sb = new StringBuilder($"[PCB] '{board.levelName}' differs from {board.savedPath}:\n");
+        foreach (var line in current) if (!stored.Contains(line)) sb.Append("  in scene only: ").Append(line).Append('\n');
+        foreach (var line in stored) if (!current.Contains(line)) sb.Append("  in saved only: ").Append(line).Append('\n');
+        Debug.LogWarning(sb.ToString(), board);
     }
 
     void LoadLevel(Board prefab)
@@ -275,7 +296,7 @@ public partial class PcbLevelEditorWindow
             if (!mb || (mb.gameObject.hideFlags & HideFlags.DontSave) != 0) continue; // skip generated visuals
             Vector3 p = root.InverseTransformPoint(mb.transform.position);
             sb.Append(PathOf(root, mb.transform)).Append(':').Append(mb.GetType().Name)
-              .Append($"@{p.x:F3},{p.y:F3}{{");
+              .Append($"@{Num(p.x)},{Num(p.y)}{{");
 
             var so = new SerializedObject(mb);
             var prop = so.GetIterator();
@@ -287,13 +308,22 @@ public partial class PcbLevelEditorWindow
                 {
                     case "m_Script": case "m_ObjectHideFlags": case "m_EditorHideFlags":
                     case "m_EditorClassIdentifier": case "m_Name": case "editorView": case "savedPath":
+                    // Unity's prefab-link bookkeeping: differs between a scene copy and the prefab asset, isn't level data
+                    case "m_CorrespondingSourceObject": case "m_PrefabInstance": case "m_PrefabAsset":
                         continue;
                 }
                 sb.Append(prop.name).Append('=').Append(ValueOf(prop, root)).Append(';');
             }
-            sb.Append('}');
+            sb.Append("}\n"); // one line per component, so a difference can be pointed out
         }
         return sb.ToString();
+    }
+
+    /// <summary>Fixed-precision number without "-0.000" (float noise around zero must not count as a change).</summary>
+    static string Num(float v, string format = "F3")
+    {
+        string s = v.ToString(format, System.Globalization.CultureInfo.InvariantCulture);
+        return s.StartsWith("-") && s.Trim('-', '0', '.') == "" ? s.Substring(1) : s;
     }
 
     static string ValueOf(SerializedProperty p, Transform root)
@@ -302,12 +332,12 @@ public partial class PcbLevelEditorWindow
         {
             case SerializedPropertyType.Integer: return p.longValue.ToString();
             case SerializedPropertyType.Boolean: return p.boolValue ? "1" : "0";
-            case SerializedPropertyType.Float: return p.floatValue.ToString("F4");
+            case SerializedPropertyType.Float: return Num(p.floatValue, "F4");
             case SerializedPropertyType.String: return p.stringValue;
             case SerializedPropertyType.Enum: return p.enumValueIndex.ToString();
             case SerializedPropertyType.ArraySize: return p.intValue.ToString();
-            case SerializedPropertyType.Vector2: return p.vector2Value.ToString("F3");
-            case SerializedPropertyType.Vector3: return p.vector3Value.ToString("F3");
+            case SerializedPropertyType.Vector2: return $"{Num(p.vector2Value.x)},{Num(p.vector2Value.y)}";
+            case SerializedPropertyType.Vector3: return $"{Num(p.vector3Value.x)},{Num(p.vector3Value.y)},{Num(p.vector3Value.z)}";
             case SerializedPropertyType.Vector2Int: return p.vector2IntValue.ToString();
             case SerializedPropertyType.Color: return p.colorValue.ToString("F3");
             case SerializedPropertyType.ObjectReference:

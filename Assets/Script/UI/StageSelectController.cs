@@ -37,7 +37,8 @@ namespace Pcb
             }
             buttonTemplate.gameObject.SetActive(false);
 
-            for (int i = 0; i < levels.Count; i++)
+            // Only unlocked stages are listed (finishing a stage unlocks the next - see Progress).
+            for (int i = 0; i < levels.Count && Progress.IsUnlocked(i); i++)
             {
                 var level = levels[i];
                 var button = Instantiate(buttonTemplate, buttonContainer);
@@ -48,13 +49,15 @@ namespace Pcb
 
                 int index = i; // capture for the closure
                 button.onClick.AddListener(() => Play(index));
+                AudioManager.HookButton(button); // click sound (created after the scene loaded)
             }
         }
 
         void Play(int index)
         {
+            AudioManager.Play(Sfx.StartGame);
             GameFlow.RequestLevel(index);
-            SceneManager.LoadScene(gameplayScene);
+            ScreenFader.LoadScene(gameplayScene);
         }
 
         public void Back()

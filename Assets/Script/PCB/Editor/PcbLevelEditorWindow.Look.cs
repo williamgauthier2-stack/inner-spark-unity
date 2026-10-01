@@ -15,7 +15,9 @@ public partial class PcbLevelEditorWindow
     int copyLookFrom;
 
     // Paint tool
-    bool paintDecorations;
+    enum PaintTarget { Nodes, Decorations, Gates }
+    static readonly string[] PaintTargetNames = { "Nodes", "Decorations", "Gates" };
+    PaintTarget paintTarget;
     NodeType paintNodeType = NodeType.Capacitor;
     DecorType paintDecorType = DecorType.Resistor;
     GameObject brush; // null = reset to the default
@@ -38,6 +40,7 @@ public partial class PcbLevelEditorWindow
         look.traceBend = LookPopup("Trace Bend", look.traceBend, theme.traceBendPrefab, theme.traceBendVariants, "overlap");
         foreach (var type in NodeTypes)
             look.Set(type, LookPopup(type.ToString(), look.For(type), theme.NodePrefab(type), theme.NodeVariants(type), "simple shape"));
+        look.gate = LookPopup("Gate", look.gate, theme.gatePrefab, theme.gateVariants, "simple block");
         if (EditorGUI.EndChangeCheck())
         {
             Undo.RecordObject(board, "Change Level Look");
@@ -91,9 +94,9 @@ public partial class PcbLevelEditorWindow
     void PaintOptionsGUI()
     {
         if (!board.theme) return;
-        paintDecorations = GUILayout.Toolbar(paintDecorations ? 1 : 0, new[] { "Nodes", "Decorations" }) == 1;
-        if (paintDecorations) paintDecorType = (DecorType)EditorGUILayout.EnumPopup("Decor Type", paintDecorType);
-        else paintNodeType = (NodeType)EditorGUILayout.EnumPopup("Node Type", paintNodeType);
+        paintTarget = (PaintTarget)GUILayout.Toolbar((int)paintTarget, PaintTargetNames);
+        if (paintTarget == PaintTarget.Decorations) paintDecorType = (DecorType)EditorGUILayout.EnumPopup("Decor Type", paintDecorType);
+        else if (paintTarget == PaintTarget.Nodes) paintNodeType = (NodeType)EditorGUILayout.EnumPopup("Node Type", paintNodeType);
 
         GetPaintOptions(paintOptions);
         if (!paintOptions.Contains(brush)) brush = null;
@@ -124,29 +127,33 @@ public partial class PcbLevelEditorWindow
         int perRow = Mathf.Max(1, Mathf.FloorToInt((position.width - 24f) / 80f));
         brush = paintOptions[GUILayout.SelectionGrid(paintOptions.IndexOf(brush), contents, perRow, paletteStyle)];
 
-        string label = paintDecorations ? paintDecorType.ToString() : paintNodeType.ToString();
+        string label = paintTarget == PaintTarget.Decorations ? paintDecorType.ToString()
+            : paintTarget == PaintTarget.Gates ? "Gate" : paintNodeType.ToString();
         using (new EditorGUILayout.HorizontalScope())
         {
             if (GUILayout.Button($"Paint All {label}s")) PaintAll(brush);
             if (GUILayout.Button($"Reset All {label}s")) PaintAll(null);
         }
         if (paintOptions.Count == 1)
-            EditorGUILayout.HelpBox(paintDecorations
+            EditorGUILayout.HelpBox(paintTarget == PaintTarget.Decorations
                 ? "No models for this decoration type yet. Add entries to the theme's Decoration Prefabs (several of the same type = variants)."
-                : "No variants for this node type yet. Add models to the theme's Catalog.", MessageType.Info);
+                : paintTarget == PaintTarget.Gates
+                    ? "No gate models yet. Set the theme's Gate Prefab and add others to Gate Variants."
+                    : "No variants for this node type yet. Add models to the theme's Catalog.", MessageType.Info);
     }
 
     /// <summary>"Default" first, then every model offered for the chosen type.</summary>
     void GetPaintOptions(List<GameObject> result)
     {
         var theme = board.theme;
-        if (paintDecorations) theme.GetDecorationVariants(paintDecorType, result);
+        result.Clear();
+        if (paintTarget == PaintTarget.Decorations) theme.GetDecorationVariants(paintDecorType, result);
         else
         {
-            result.Clear();
-            AddUnique(result, theme.NodePrefab(paintNodeType));
-            AddUnique(result, board.look.For(paintNodeType));
-            var variants = theme.NodeVariants(paintNodeType);
+            bool gates = paintTarget == PaintTarget.Gates;
+            AddUnique(result, gates ? theme.gatePrefab : theme.NodePrefab(paintNodeType));
+            AddUnique(result, gates ? board.look.gate : board.look.For(paintNodeType));
+            var variants = gates ? theme.gateVariants : theme.NodeVariants(paintNodeType);
             if (variants != null) foreach (var v in variants) AddUnique(result, v);
         }
         result.Insert(0, null);
@@ -154,17 +161,25 @@ public partial class PcbLevelEditorWindow
 
     string DefaultPaintName()
     {
-        var model = paintDecorations ? board.theme.GetDecorationPrefab(paintDecorType) : board.DefaultNodeModel(paintNodeType);
-        return model ? model.name : paintDecorations ? "placeholder" : "simple shape";
+        var model = paintTarget == PaintTarget.Decorations ? board.theme.GetDecorationPrefab(paintDecorType)
+            : paintTarget == PaintTarget.Gates ? (board.look.gate ? board.look.gate : board.theme.gatePrefab)
+            : board.DefaultNodeModel(paintNodeType);
+        return model ? model.name : paintTarget == PaintTarget.Nodes ? "simple shape" : "placeholder";
     }
 
     void PaintTool(Event e, Vector2 mouse)
     {
         Component target = null;
-        if (paintDecorations)
+        Trace gateTrace = null;
+        if (paintTarget == PaintTarget.Decorations)
         {
             var d = PickDecoration(mouse);
             if (d && d.type == paintDecorType) target = d;
+        }
+        else if (paintTarget == PaintTarget.Gates)
+        {
+            var t = PickNode(mouse) ? null : PickTrace(mouse);
+            if (t && t.TryGetComponent(out GateMechanic gate)) { target = gate; gateTrace = t; }
         }
         else
         {
@@ -187,6 +202,13 @@ public partial class PcbLevelEditorWindow
         if (e.type != EventType.Repaint) return;
         if (target is PcbNode node) HighlightNode(node, Color.green);
         else if (target is PcbDecoration decor) HighlightDecoration(decor, Color.green);
+        else if (gateTrace)
+        {
+            var path = new List<Vector3>();
+            gateTrace.GetWorldPath(board, false, path);
+            Handles.color = Color.green;
+            Handles.DrawAAPolyLine(8f, path.ToArray());
+        }
     }
 
     /// <summary>Both sides of the board, not just the one being edited.</summary>
@@ -194,10 +216,15 @@ public partial class PcbLevelEditorWindow
     {
         Undo.SetCurrentGroupName(model ? "Paint All" : "Reset All");
         int group = Undo.GetCurrentGroup();
-        if (paintDecorations)
+        if (paintTarget == PaintTarget.Decorations)
         {
             foreach (var d in board.Decorations)
                 if (d && d.type == paintDecorType) { Undo.RecordObject(d, "Paint All"); SetModel(d, model); }
+        }
+        else if (paintTarget == PaintTarget.Gates)
+        {
+            foreach (var t in board.Traces)
+                if (t && t.TryGetComponent(out GateMechanic gate)) { Undo.RecordObject(gate, "Paint All"); SetModel(gate, model); }
         }
         else
         {
@@ -213,5 +240,6 @@ public partial class PcbLevelEditorWindow
     {
         if (target is PcbNode n) n.model = model;
         else if (target is PcbDecoration d) d.model = model;
+        else if (target is GateMechanic g) g.model = model;
     }
 }

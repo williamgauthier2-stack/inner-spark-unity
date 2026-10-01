@@ -16,6 +16,7 @@ namespace Pcb
         public GameObject model;
 
         public bool IsVia => type == NodeType.Via;
+        public bool IsSwitch => type == NodeType.Switch || type == NodeType.AndSwitch;
         public bool IsOnLayer(PcbLayer l) => IsVia || layer == l;
     }
 }

@@ -12,10 +12,14 @@ namespace Pcb
         public GameObject mainPanel;
         public GameObject stageSelectPanel;
 
+        void Start() => AudioManager.PlayMusic(Music.Menu);
+
+        /// <summary>Continues from the furthest unlocked stage (the LevelManager keeps it within the Level List).</summary>
         public void Play()
         {
-            GameFlow.RequestLevel(0);
-            SceneManager.LoadScene(gameplayScene);
+            AudioManager.Play(Sfx.StartGame);
+            GameFlow.RequestLevel(Progress.Unlocked);
+            ScreenFader.LoadScene(gameplayScene);
         }
 
         public void OpenStageSelect()

@@ -15,8 +15,5 @@ MonoBehaviour:
   lines:
   - speakerName: Sparkie
     portrait: {fileID: 10901, guid: 0000000000000000f000000000000000, type: 0}
-    text: 'Next stop: Altary2600! '
-  - speakerName: Sparkie
-    portrait: {fileID: 10901, guid: 0000000000000000f000000000000000, type: 0}
-    text: With swappable cartridges, one little box could play a whole library of
-      games. Rise and shine!
+    text: 'Next stop: Atari 2600! Outside, a little box. Slot in a cartridge, and
+      inside it turns into a whole library of worlds.'

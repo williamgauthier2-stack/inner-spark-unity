@@ -60,6 +60,8 @@ namespace Pcb
                 if (!trace || !trace.IsValid) continue;
                 trace.GetPath(board, false, path);
                 BuildTrace(root, board, trace, path, theme, trace.layer == PcbLayer.Front ? front : back);
+                if (trace.TryGetComponent(out GateMechanic gate))
+                    BuildGate(root, board, trace, gate, path, theme, trace.layer == PcbLayer.Front ? front : back);
             }
             foreach (var node in board.Nodes)
             {
@@ -126,17 +128,24 @@ namespace Pcb
             float o = Out(side);
             var g = Group(root, node.name, new Vector3(p.x, p.y, node.IsVia ? 0f : Surface(side, t)), node);
             g.localRotation = Quaternion.Euler(0f, 0f, node.rotationDegrees); // spin around the board normal
+            if (node.TryGetComponent(out DataMechanic _))
+                BuildHover(g, "Data", theme.dataPrefab, theme.dataHeight, 0f, side, theme, list);
+            if (node.type == NodeType.Goal && board.GoalLocked) // a lock hovers over the goal while data is left
+                BuildHover(g, "Goal Lock", theme.goalLockPrefab, theme.goalLockHeight, theme.goalLockUpOffset, side, theme, list);
 
+            // GameObject model = node.type switch
+            // {
+            //     NodeType.Capacitor => theme.capacitorPrefab,
+            //     NodeType.Via => theme.viaPrefab,
+            //     NodeType.Start => theme.startPrefab,
+            //     NodeType.Goal => theme.goalPrefab,
+            //     _ => null
+            // };
             var model = board.NodeModel(node);
             if (model)
             {
                 var m = Object.Instantiate(model, g, false);
-                if (side == PcbLayer.Back)
-                {
-                    var lp = m.transform.localPosition;
-                    m.transform.localPosition = new Vector3(-lp.x, lp.y, -lp.z);
-                    m.transform.localRotation = Quaternion.Euler(0f, 180f, 0f) * m.transform.localRotation;
-                }
+                m.transform.localRotation = side == PcbLayer.Back ? Quaternion.Euler(0f, 180f, 0f) : Quaternion.identity;
                 list.AddRange(m.GetComponentsInChildren<Renderer>(true));
 
                 if (node.IsVia)
@@ -148,6 +157,10 @@ namespace Pcb
                     m2.transform.localRotation = Quaternion.Euler(0f, 180f, 0f) * m2.transform.localRotation;
                     list.AddRange(m2.GetComponentsInChildren<Renderer>(true));
                 }
+
+                // Switch models show their starting ON/OFF look; SwitchMechanic swaps it on each press.
+                bool isOn = node.TryGetComponent(out SwitchMechanic sw) && sw.isOn;
+                foreach (var look in g.GetComponentsInChildren<SwitchVisual>(true)) look.Show(isOn);
                 return;
             }
 
@@ -203,6 +216,7 @@ namespace Pcb
                     break;
                 }
                 case NodeType.Switch:
+                case NodeType.AndSwitch:
                 {
                     float d = theme.capacitorSize, h = theme.capacitorHeight;
                     Part(g, Cylinder, new Vector3(0f, 0f, o * h * 0.5f), Upright, new Vector3(d, h * 0.5f, d), theme.metalMaterial, list);
@@ -210,6 +224,85 @@ namespace Pcb
                     break;
                 }
             }
+        }
+
+        /// <summary>
+        /// A model hovering above a node (data pickup, goal lock): bobs gently, and HoverVisual.Dismiss() shrinks it
+        /// away. No prefab = a small glowing cube placeholder.
+        /// </summary>
+        static void BuildHover(Transform g, string name, GameObject prefab, float height, float upOffset, PcbLayer side, PcbTheme theme, List<Renderer> list)
+        {
+            var holder = new GameObject(name).transform;
+            holder.SetParent(g, false);
+            // 'height' out from the board face; 'upOffset' up on screen = the board's +Y, undoing the node's own spin.
+            Vector3 up = Quaternion.Inverse(g.localRotation) * Vector3.up;
+            holder.localPosition = new Vector3(0f, 0f, Out(side) * height) + up * upOffset;
+            holder.gameObject.AddComponent<HoverVisual>();
+            if (prefab)
+            {
+                var m = Object.Instantiate(prefab, holder, false);
+                if (side == PcbLayer.Back) m.transform.localRotation = Quaternion.Euler(0f, 180f, 0f) * m.transform.localRotation;
+                list.AddRange(m.GetComponentsInChildren<Renderer>(true));
+            }
+            else Part(holder, Cube, Vector3.zero, Quaternion.Euler(45f, 45f, 0f), Vector3.one * 0.12f, theme.sparkMaterial, list);
+        }
+
+        /// <summary>
+        /// A gate standing across the middle of its trace (by length, so bends are fine), lined up with the
+        /// segment it sits on. Placed at the model's authored size; X = along the trace, top facing -Z.
+        /// </summary>
+        static void BuildGate(Transform root, Board board, Trace trace, GateMechanic gate, List<Vector2> path, PcbTheme theme, List<Renderer> list)
+        {
+            if (path.Count < 2) return;
+            PathMiddle(path, out Vector2 middle, out Vector2 direction);
+            float z = Surface(trace.layer, theme.boardThickness) + Out(trace.layer) * theme.traceHeight; // on top of the copper
+            var g = Group(root, trace.name + " Gate", new Vector3(middle.x, middle.y, z), gate);
+            g.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg) *
+                (trace.layer == PcbLayer.Back ? Quaternion.Euler(0f, 180f, 0f) : Quaternion.identity);
+
+            var model = board.GateModel(gate);
+            if (model)
+            {
+                var m = Object.Instantiate(model, g, false);
+                list.AddRange(m.GetComponentsInChildren<Renderer>(true));
+            }
+            else // placeholder barrier across the trace
+                Part(g, Cube, new Vector3(0f, 0f, Out(PcbLayer.Front) * 0.08f), Quaternion.identity,
+                    new Vector3(0.06f, theme.traceWidth * 2.5f, 0.16f), theme.chipMaterial, list);
+            ShowGateState(g, gate.ShownOpen);
+        }
+
+        /// <summary>OPEN / CLOSED look of a gate: its LockVisual (Locked = closed) if it has one, else hidden while open.</summary>
+        public static void ShowGateState(Transform gateLook, bool open)
+        {
+            var looks = gateLook.GetComponentsInChildren<LockVisual>(true);
+            if (looks.Length > 0)
+            {
+                foreach (var look in looks) look.Show(!open);
+                return;
+            }
+            for (int i = 0; i < gateLook.childCount; i++) gateLook.GetChild(i).gameObject.SetActive(!open);
+        }
+
+        /// <summary>Point halfway along a path (by length) and the direction of the segment it's on.</summary>
+        static void PathMiddle(List<Vector2> path, out Vector2 middle, out Vector2 direction)
+        {
+            float total = 0f;
+            for (int i = 0; i < path.Count - 1; i++) total += Vector2.Distance(path[i], path[i + 1]);
+            float half = total * 0.5f;
+            for (int i = 0; i < path.Count - 1; i++)
+            {
+                float d = Vector2.Distance(path[i], path[i + 1]);
+                if (half <= d || i == path.Count - 2)
+                {
+                    direction = (path[i + 1] - path[i]).normalized;
+                    middle = Vector2.Lerp(path[i], path[i + 1], d > 0f ? Mathf.Clamp01(half / d) : 0f);
+                    return;
+                }
+                half -= d;
+            }
+            middle = path[0];
+            direction = Vector2.right;
         }
 
         static void BuildDecoration(Transform root, Board board, PcbDecoration decor, PcbTheme theme, List<Renderer> list)

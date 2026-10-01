@@ -8,7 +8,8 @@ namespace Pcb
         Via,       // stop point that exists on both sides; the spark can flip side here
         Start,     // where the spark spawns
         Goal,      // chip that ends the level
-        Switch     // toggle switch
+        Switch,    // toggle switch: each press flips every normal gate it's linked to
+        AndSwitch  // toggle switch for AND gates: a gate opens only while all its AND switches are on
     }
 
     /// <summary>Purely cosmetic PCB set-dressing. Never a stop point, never part of the movement graph.</summary>

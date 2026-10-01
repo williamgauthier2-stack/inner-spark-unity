@@ -1,0 +1,54 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 869621a6e1802024990ec657b7f45891, type: 3}
+  m_Name: SoundBank
+  m_EditorClassIdentifier: Assembly-CSharp::Pcb.SoundBank
+  menuMusic:
+    clip: {fileID: 8300000, guid: 548891b3f55f84e448c62152cd5ea726, type: 3}
+    volume: 1
+  gameplayMusic:
+    clip: {fileID: 8300000, guid: 548891b3f55f84e448c62152cd5ea726, type: 3}
+    volume: 1
+  pausedMusicVolume: 0.4
+  buttonClick:
+    clip: {fileID: 8300000, guid: 00f4cd8ece0f5e043b71f7dc20ccdfee, type: 3}
+    volume: 1
+  startGame:
+    clip: {fileID: 8300000, guid: 6a1c7a0c05aae3749adfd3d126a12b5e, type: 3}
+    volume: 1
+  win:
+    clip: {fileID: 8300000, guid: 3e5b892f59f49ab4e8c71cd2327adb20, type: 3}
+    volume: 1
+  switchToggle:
+    clip: {fileID: 0}
+    volume: 1
+  pickup:
+    clip: {fileID: 0}
+    volume: 1
+  goalUnlock:
+    clip: {fileID: 0}
+    volume: 1
+  gateOpen:
+    clip: {fileID: 0}
+    volume: 1
+  gateClose:
+    clip: {fileID: 0}
+    volume: 1
+  fail:
+    clip: {fileID: 0}
+    volume: 1
+  travel:
+    clip: {fileID: 0}
+    volume: 1
+  dialogTalking:
+    clip: {fileID: 8300000, guid: ca2a24470d461184181f975b3ab10a5f, type: 3}
+    volume: 1

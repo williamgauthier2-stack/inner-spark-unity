@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -5,8 +6,10 @@ namespace Pcb
 {
     /// <summary>
     /// One per scene. Plays the levels from the LevelList: spawns the board and the spark,
-    /// detects the Goal, and handles restart plus a simple HUD.
+    /// detects the Goal, and handles restart and the win pop-up.
     /// If a Board is already in the scene (the one you are editing), play starts on it.
+    /// Entering a stage: black → fade in → music → [intro cinematic] → spark appears → [dialog] → play.
+    /// Restart: quick fade → spark appears → play (no cinematic, no dialog; the music keeps going).
     /// </summary>
     public class LevelManager : MonoBehaviour
     {
@@ -19,6 +22,20 @@ namespace Pcb
         public PauseMenu pauseMenu;
         [Tooltip("Optional. Shown before play if the current level has a DialogSequence assigned.")]
         public DialogController dialogController;
+        [Tooltip("Optional. Shown when the current level is won (not after the last one: that goes to the ending).")]
+        public WinPanel winPanel;
+        [Tooltip("Scene loaded (with a fade) after the last stage in the Level List is won.")]
+        public string endingScene = "Ending";
+
+        [Header("Staging")]
+        [Tooltip("Optional. Every stage's board is centred on this point (a fixed spot in the room).")]
+        public Transform boardAnchor;
+        [Tooltip("Camera far clip at least this far (0 = just fit the board). Raise it if the room gets cut off.")]
+        public float cameraFarClip = 0f;
+        [Tooltip("Seconds to fade to / from black when entering a stage.")]
+        [Min(0f)] public float fadeTime = ScreenFader.DefaultDuration;
+        [Tooltip("Seconds to fade to / from black on a restart.")]
+        [Min(0f)] public float restartFadeTime = 0.25f;
 
         GameObject template; // what Restart re-creates: a level prefab, or the disabled scene board
         int index = -1;
@@ -27,8 +44,8 @@ namespace Pcb
         Spark spark;
         bool won;
         float wonAt;
+        bool transitioning; // stage start / restart sequence running: no restart, next or tilting
         InputAction restartAction, confirmAction;
-        GUIStyle hudStyle, bigStyle;
 
         public Board CurrentBoard => current;
 
@@ -51,6 +68,8 @@ namespace Pcb
 
         void Start()
         {
+            ScreenFader.Claim();    // this scene does its own fade-in, at the right point of the sequence
+            ScreenFader.SetBlack();
             var allSceneBoards = FindObjectsByType<Board>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
             foreach (var b in allSceneBoards) b.gameObject.SetActive(false);
             
@@ -69,7 +88,7 @@ namespace Pcb
                 // Editor: play the board being edited, keeping an untouched copy for restarts.
                 template = sceneBoard.gameObject;
                 index = levels ? levels.IndexOf(sceneBoard.levelName) : -1;
-                Spawn(showDialog: true);
+                StartCoroutine(EnterStage());
             }
             else if (levelsAvailable)
             {
@@ -78,29 +97,95 @@ namespace Pcb
             else Debug.LogError("[PCB] No Board in the scene and no levels in the Level List.", this);
         }
 
+        /// <summary>Enters a stage (fade, intro cinematic, spark, dialog - see the class summary).</summary>
         public void GoTo(int levelIndex)
         {
-            if (!levels || levels.Count == 0) return;
-            index = (levelIndex % levels.Count + levels.Count) % levels.Count;
+            if (!levels || levels.Count == 0 || transitioning) return;
+            index = Mathf.Clamp(levelIndex, 0, levels.Count - 1);
             template = levels[index] ? levels[index].gameObject : null;
-            Spawn(showDialog: true);
+            StartCoroutine(EnterStage());
         }
 
         public void Next() => GoTo(index + 1); // advances after a win; see OnArrived/Update
-        public void Restart() => Spawn(showDialog: false); // replaying a level you've already seen the intro for
 
-        void Spawn(bool showDialog)
+        /// <summary>Replays the level: quick fade, no cinematic or dialog (already seen), the music keeps going.</summary>
+        public void Restart()
         {
-            if (!template) { Debug.LogError($"[PCB] Level {index + 1} is missing from the Level List.", this); return; }
-            if (spark) spark.Arrived -= OnArrived;
+            if (!transitioning) StartCoroutine(RestartStage());
+        }
+
+        IEnumerator EnterStage()
+        {
+            transitioning = true;
+            if (pauseMenu) pauseMenu.SetAvailable(false); // no pause / restart during the start sequence + dialog
+            yield return ScreenFader.FadeOut(fadeTime);
+            if (!Spawn()) { transitioning = false; if (pauseMenu) pauseMenu.SetAvailable(true); yield return ScreenFader.FadeIn(fadeTime); yield break; }
+
+            // The intro's device is already in place (around the board) while the screen is still black.
+            StageIntro intro = null;
+            if (current.intro)
+            {
+                intro = Instantiate(current.intro, rig.transform.position, rig.transform.rotation);
+                intro.Begin(Camera.main);
+            }
+            yield return ScreenFader.FadeIn(fadeTime);
+            AudioManager.PlayMusic(Music.Gameplay, restart: true);
+            if (intro) yield return intro.Play(rig);
+
+            yield return AppearSpark();
+            if (current.dialogSequence && dialogController)
+            {
+                bool done = false;
+                dialogController.Show(current.dialogSequence, () => done = true);
+                while (!done) yield return null;
+            }
+            BeginPlay();
+        }
+
+        IEnumerator RestartStage()
+        {
+            transitioning = true;
+            if (pauseMenu) pauseMenu.SetAvailable(false);
+            yield return ScreenFader.FadeOut(restartFadeTime);
+            if (!Spawn()) { transitioning = false; if (pauseMenu) pauseMenu.SetAvailable(true); yield return ScreenFader.FadeIn(restartFadeTime); yield break; }
+            yield return ScreenFader.FadeIn(restartFadeTime);
+            yield return AppearSpark();
+            BeginPlay();
+        }
+
+        IEnumerator AppearSpark()
+        {
+            spark.Appear();
+            while (spark && spark.IsBusy) yield return null; // the character's appear animation
+        }
+
+        void BeginPlay()
+        {
+            if (spark) spark.InputLocked = false;
+            if (rig) rig.InspectLocked = false;
+            if (pauseMenu) pauseMenu.SetAvailable(true);
+            transitioning = false;
+        }
+
+        /// <summary>Builds the level's board, rig and spark (hidden and locked until the sequence lets it go).</summary>
+        bool Spawn()
+        {
+            if (!template) { Debug.LogError($"[PCB] Level {index + 1} is missing from the Level List.", this); return false; }
+            if (spark)
+            {
+                spark.Arrived -= OnArrived;
+                spark.WinFinished -= OnWinFinished;
+            }
             if (rig) Destroy(rig.gameObject); // takes the board and the spark with it
             won = false;
+            if (winPanel) winPanel.Hide();
 
             var go = Instantiate(template);
             go.name = template.name;
             go.SetActive(true); // Board.Awake builds the graph and the 3D look
             current = go.GetComponent<Board>();
-            rig = BoardRig.Create(current, Camera.main);
+            rig = BoardRig.Create(current, Camera.main, boardAnchor, cameraFarClip);
+            rig.InspectLocked = true;
 
             PcbNode start = null;
             foreach (var n in current.Nodes)
@@ -108,62 +193,48 @@ namespace Pcb
             if (!start)
             {
                 Debug.LogError($"[PCB] Level '{current.levelName}' has no Start node.", this);
-                return;
+                return false;
             }
 
             spark = sparkPrefab ? Instantiate(sparkPrefab) : new GameObject("Spark").AddComponent<Spark>();
+            spark.InputLocked = true;
             spark.Init(current, start, rig);
             spark.Arrived += OnArrived;
-
-            if (showDialog && current.dialogSequence && dialogController)
-            {
-                spark.enabled = false;
-                dialogController.Show(current.dialogSequence, () => { if (spark) spark.enabled = true; });
-            }
+            spark.WinFinished += OnWinFinished;
+            return true;
         }
 
         void OnArrived(PcbNode node)
         {
-            if (node.type != NodeType.Goal) return;
+            if (node.type != NodeType.Goal || current.GoalLocked) return; // locked goal: data still to collect
+            spark.InputLocked = true; // no more input; the win screen waits for the spark's win animation (OnWinFinished)
+        }
+
+        void OnWinFinished()
+        {
+            Progress.Completed(index); // unlocks the next stage (saved)
+            if (levels && index >= 0 && index == levels.Count - 1)
+            {
+                // The last stage: straight to the ending, no win pop-up.
+                transitioning = true; // no restart meanwhile
+                if (pauseMenu) pauseMenu.SetAvailable(false);
+                ScreenFader.LoadScene(endingScene);
+                return;
+            }
             won = true;
             wonAt = Time.time;
-            spark.enabled = false;
+            if (winPanel) winPanel.Show(); // input is already locked since the goal (OnArrived)
         }
 
         void Update()
         {
             if (pauseMenu && pauseMenu.IsPaused) return;
             if (dialogController && dialogController.IsShowing) return;
+            if (transitioning) return;
 
             if (restartAction.WasPressedThisFrame()) Restart();
             else if (won && Time.time - wonAt > 0.4f && confirmAction.WasPressedThisFrame()) Next();
         }
-
-        void OnGUI()
-        {
-            if (!current) return;
-            if (pauseMenu && pauseMenu.IsPaused) return;
-            if (dialogController && dialogController.IsShowing) return;
-            if (hudStyle == null)
-            {
-                hudStyle = new GUIStyle(GUI.skin.label) { richText = true };
-                bigStyle = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, richText = true };
-            }
-            int font = Mathf.Max(12, Screen.height / 40);
-            hudStyle.fontSize = font;
-            bigStyle.fontSize = Mathf.Max(24, Screen.height / 12);
-
-            string number = index >= 0 && levels ? $"{index + 1}/{levels.Count}" : "unsaved";
-            string side = current.View == PcbLayer.Front ? "FRONT" : "<color=#7fd4ff>BACK</color>";
-            string hud = $"<b>{current.levelName}</b>  ({number})\nSide: <b>{side}</b>\n" +
-                         $"<size={font * 3 / 4}>Move: WASD / Arrows   Flip (on via): Space   Inspect: drag mouse   Restart: R</size>";
-            if (spark && !won && !spark.IsMoving && !spark.IsTurning && spark.CurrentNode && spark.CurrentNode.IsVia)
-                hud += "\n<color=#ffe08a>On a via: press Space to flip side</color>";
-            GUI.Label(new Rect(16, 12, Screen.width - 32, Screen.height * 0.3f), hud, hudStyle);
-
-            if (won)
-                GUI.Label(new Rect(0, 0, Screen.width, Screen.height),
-                    $"<b>CIRCUIT COMPLETE</b>\n<size={bigStyle.fontSize / 3}>Space / Enter: next board    R: replay</size>", bigStyle);
-        }
+        // No on-screen text during play: controls are taught in each stage's intro dialog.
     }
 }

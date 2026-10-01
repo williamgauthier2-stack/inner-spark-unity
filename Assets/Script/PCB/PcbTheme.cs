@@ -26,8 +26,16 @@ namespace Pcb
         public GameObject viaPrefab;
         public GameObject startPrefab;
         public GameObject goalPrefab;
+        [Tooltip("Normal switch. Give the prefab a SwitchVisual with its ON and OFF models to show the state.")]
         public GameObject switchPrefab;
+        [Tooltip("AND switch. Give the prefab a SwitchVisual with its ON (pressed) and OFF models to show the state.")]
+        public GameObject andSwitchPrefab;
+        [Tooltip("Gate standing across a trace: length along X (the trace), top facing -Z. Give it a LockVisual with its CLOSED (Locked) and OPEN (Unlocked) models; without one it just disappears when open.")]
         public GameObject gatePrefab;
+        [Tooltip("Data pickup, hovering above its capacitor. Author it centred on its own origin. Empty = small glowing cube.")]
+        public GameObject dataPrefab;
+        [Tooltip("Lock hovering over the goal while data is left; shrinks away when the last data is collected. Centred on its own origin.")]
+        public GameObject goalLockPrefab;
         [Tooltip("One repeatable board tile, thickness along Z. Resized to fill boardTileSize x boardTileSize x boardThickness and repeated across the whole board.")]
         public GameObject boardTilePrefab;
         [Tooltip("One straight piece of trace, length along X, height along Z. Stretched to each segment's length x traceWidth x traceHeight.")]
@@ -51,6 +59,7 @@ namespace Pcb
         public GameObject[] startVariants;
         public GameObject[] goalVariants;
         public GameObject[] switchVariants;
+        public GameObject[] andSwitchVariants;
         public GameObject[] gateVariants;
         public GameObject[] boardTileVariants;
         public GameObject[] traceVariants;
@@ -80,6 +89,7 @@ namespace Pcb
             NodeType.Via => viaPrefab,
             NodeType.Start => startPrefab,
             NodeType.Switch => switchPrefab,
+            NodeType.AndSwitch => andSwitchPrefab,
             _ => goalPrefab
         };
 
@@ -89,6 +99,7 @@ namespace Pcb
             NodeType.Via => viaVariants,
             NodeType.Start => startVariants,
             NodeType.Switch => switchVariants,
+            NodeType.AndSwitch => andSwitchVariants,
             _ => goalVariants
         };
 
@@ -117,6 +128,14 @@ namespace Pcb
 
         [Header("Goal chip")]
         public float chipHeight = 0.14f;
+
+        [Header("Data pickup / goal lock")]
+        [Tooltip("How far above the board surface the data floats, in world units.")]
+        public float dataHeight = 0.45f;
+        [Tooltip("How far out from the board face the goal lock hovers while data is left (towards the camera).")]
+        public float goalLockHeight = 0.4f;
+        [Tooltip("Moves the goal lock up on screen (along the board), so it floats above the goal instead of in front of the spark standing there.")]
+        public float goalLockUpOffset = 0f;
 
         [Header("Start plug")]
         public Vector3 plugSize = new Vector3(0.46f, 0.34f, 0.26f);

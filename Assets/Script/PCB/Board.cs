@@ -19,7 +19,9 @@ namespace Pcb
             public GameObject trace;
             public GameObject traceBend;
             [Tooltip("Default model for every node of that type on this level (a node's own Model still wins).")]
-            public GameObject capacitor, via, start, goal, switchNode;
+            public GameObject capacitor, via, start, goal, switchNode, andSwitch;
+            [Tooltip("Default gate model on this level (a gate's own Model still wins).")]
+            public GameObject gate;
 
             public GameObject For(NodeType type) => type switch
             {
@@ -27,6 +29,7 @@ namespace Pcb
                 NodeType.Via => via,
                 NodeType.Start => start,
                 NodeType.Switch => switchNode,
+                NodeType.AndSwitch => andSwitch,
                 _ => goal
             };
 
@@ -38,6 +41,7 @@ namespace Pcb
                     case NodeType.Via: via = model; break;
                     case NodeType.Start: start = model; break;
                     case NodeType.Switch: switchNode = model; break;
+                    case NodeType.AndSwitch: andSwitch = model; break;
                     default: goal = model; break;
                 }
             }
@@ -56,6 +60,8 @@ namespace Pcb
         public PcbTheme theme;
         [Tooltip("Optional. Shown once, before the player gets control, when this level starts.")]
         public DialogSequence dialogSequence;
+        [Tooltip("Optional. Intro cinematic prefab (StageIntro) played when this stage is entered, before the spark appears.")]
+        public StageIntro intro;
         [Tooltip("This level's look (Level Editor > Look). Empty entries use the theme.")]
         public BoardLook look;
         [Min(0.1f)] public float cellSize = 0.5f;
@@ -98,13 +104,16 @@ namespace Pcb
         void Update()
         {
             if (Application.isPlaying) return;
-            showBothSides = true; // editing: everything visible, the editor draws the hidden side as a ghost
             Rebuild();
         }
 
         /// <summary>Re-collects nodes and traces, rebuilds the movement graph and (if anything changed) the 3D look.</summary>
         public void Rebuild()
         {
+            // Editing: everything visible, the editor draws the hidden side as a ghost. Set here rather than only
+            // in Update, so a Rebuild called straight away (Level Editor Load / New Level) doesn't build the look
+            // with the back side hidden - it would stay hidden, since nothing re-applies it until the level changes.
+            if (!Application.isPlaying) showBothSides = true;
             nodes.Clear();
             foreach (var c in GetComponentsInChildren<PcbNode>(true))
                 if ((c.gameObject.hideFlags & HideFlags.DontSave) == 0) nodes.Add(c);
@@ -224,6 +233,58 @@ namespace Pcb
         public GameObject NodeModel(PcbNode node) => node.model ? node.model : DefaultNodeModel(node.type);
         public GameObject DecorationModel(PcbDecoration decor) =>
             decor.model ? decor.model : theme ? theme.GetDecorationPrefab(decor.type) : null;
+        public GameObject GateModel(GateMechanic gate) =>
+            gate.model ? gate.model : look.gate ? look.gate : theme ? theme.gatePrefab : null;
+
+        // ---------------------------------------------------------------- data / goal lock
+
+        /// <summary>This level has data pickups at all (its goal shows a lock until they're collected).</summary>
+        public bool HasData
+        {
+            get
+            {
+                foreach (var n in nodes)
+                    if (n && n.TryGetComponent(out DataMechanic _)) return true;
+                return false;
+            }
+        }
+
+        /// <summary>True while any data pickup on the board is uncollected: the Goal doesn't win yet.</summary>
+        public bool GoalLocked
+        {
+            get
+            {
+                foreach (var n in nodes)
+                    if (n && n.TryGetComponent(out DataMechanic data) && !data.Collected) return true;
+                return false;
+            }
+        }
+
+        /// <summary>The generated look groups belonging to a node/trace/decoration.</summary>
+        public List<Transform> VisualsOf(Component owner)
+        {
+            var result = new List<Transform>();
+            if (visuals)
+                foreach (var v in visuals.GetComponentsInChildren<PcbVisualOwner>(true))
+                    if (v.owner == owner) result.Add(v.transform);
+            return result;
+        }
+
+        /// <summary>Sends every goal's hovering lock away; returns the goals' looks (e.g. for an effect).</summary>
+        public List<Transform> UnlockGoals()
+        {
+            var result = new List<Transform>();
+            foreach (var n in nodes)
+            {
+                if (!n || n.type != NodeType.Goal) continue;
+                foreach (var look in VisualsOf(n))
+                {
+                    foreach (var hover in look.GetComponentsInChildren<HoverVisual>()) hover.Dismiss();
+                    result.Add(look);
+                }
+            }
+            return result;
+        }
 
         // ---------------------------------------------------------------- coordinates
 
@@ -257,12 +318,14 @@ namespace Pcb
                 if (!Application.isPlaying) Add(JsonUtility.ToJson(theme).GetHashCode()); // live theme tweaks while editing
                 Add(sizeInCells.x); Add(sizeInCells.y); Add(Mathf.RoundToInt(cellSize * 1000f));
                 Add(Id(look.boardTile)); Add(Id(look.trace)); Add(Id(look.traceBend));
-                Add(Id(look.capacitor)); Add(Id(look.via)); Add(Id(look.start)); Add(Id(look.goal)); Add(Id(look.switchNode));
+                Add(Id(look.capacitor)); Add(Id(look.via)); Add(Id(look.start)); Add(Id(look.goal)); Add(Id(look.switchNode)); Add(Id(look.andSwitch)); Add(Id(look.gate));
                 foreach (var n in nodes)
                 {
                     if (!n) continue; // can go missing mid-rebuild (deleted via Undo/Erase while editing)
                     Add(Id(n)); Add((int)n.type); Add((int)n.layer); Add(Id(n.model));
                     Add(Mathf.RoundToInt(n.rotationDegrees * 1000f));
+                    if (n.TryGetComponent(out SwitchMechanic sw)) Add(sw.isOn ? 1 : 2); // starting ON/OFF look
+                    if (n.TryGetComponent(out DataMechanic _)) Add(3); // data pickup (also grays the goal)
                     AddV(NodePosition(n)); AddV(n.chipSize); Add(n.name.GetHashCode());
                 }
                 foreach (var t in traces)
@@ -270,6 +333,7 @@ namespace Pcb
                     if (!t) continue;
                     Add(Id(t)); Add(Id(t.from)); Add(Id(t.to));
                     Add((int)t.layer); Add(t.bends.Count);
+                    if (t.TryGetComponent(out GateMechanic gate)) { Add(Id(gate.model)); Add(gate.ShownOpen ? 1 : 2); }
                     foreach (var b in t.bends) AddV(b);
                 }
                 foreach (var d in decorations)

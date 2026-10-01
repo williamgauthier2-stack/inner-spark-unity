@@ -22,29 +22,56 @@ MonoBehaviour:
   sparkMaterial: {fileID: 2100000, guid: 870ae74c03dc55a4da15da158ddfa5f7, type: 2}
   spriteMaterial: {fileID: 2100000, guid: ed1afe98f12c83b46926106649caa863, type: 2}
   triangle: {fileID: 21300000, guid: e01b62cdb89699542995a07ef0599de5, type: 3}
-  capacitorPrefab: {fileID: 7043062803041349706, guid: f83a24d14df23244b8393346d1676868, type: 3}
-  viaPrefab: {fileID: 5081282958106826189, guid: f7416e6b361b4824f9125cb2e87643c8, type: 3}
-  startPrefab: {fileID: 1509393273787007909, guid: ed766568b150b3f478867ac7c81db4a4, type: 3}
-  goalPrefab: {fileID: 6253218023686254846, guid: f02e0496086a7274baf3a231214398f9, type: 3}
-  switchPrefab: {fileID: 7043062803041349706, guid: 70d481c5d228655428a938b3f65adab8, type: 3}
-  gatePrefab: {fileID: 1514149792772791552, guid: a17898996168f7a40b0d37b102f4be34, type: 3}
-  boardTilePrefab: {fileID: 2444709825185522148, guid: dbc604c8a673ea6498aaf9ca569b2e7a, type: 3}
+  capacitorPrefab: {fileID: 4715971414759615151, guid: b7c2ded5f1dd3d6459035423c36281a1, type: 3}
+  viaPrefab: {fileID: 8118843376023283083, guid: 667ba4f0f8c23e043bcecc963dcb4587, type: 3}
+  startPrefab: {fileID: 4273543922784201026, guid: b81a5a67156859c4e850741ddd1c4cf2, type: 3}
+  goalPrefab: {fileID: 1822291219977491971, guid: a2bb2727f72410e49bb1490391b9f3f5, type: 3}
+  switchPrefab: {fileID: 7055210035048420528, guid: 215fd514da95e394088ff764b7fe5656, type: 3}
+  andSwitchPrefab: {fileID: 5109207269138497487, guid: aadc360d86ac54946b0b441866712741, type: 3}
+  gatePrefab: {fileID: 8946151214205948250, guid: 19b0f6b5d7f85aa4bb61e09b1d1bccfe, type: 3}
+  dataPrefab: {fileID: 3282992957422389139, guid: c9daa186d3e922a4eb24fe93ad6f6a90, type: 3}
+  goalLockPrefab: {fileID: 8761898266923241318, guid: 8741e70ac5daccf49bd9f445b0f20969, type: 3}
+  boardTilePrefab: {fileID: 8720090434053599027, guid: 02d1311ef76d3c54ca54fc84873380e5, type: 3}
   tracePrefab: {fileID: 1514149792772791552, guid: 651a6812693f1574aae1aa1e60f8d0e8, type: 3}
-  traceBendPrefab: {fileID: 0}
+  traceBendPrefab: {fileID: 6614226478440039817, guid: 5a5a7775597fc9a4eace200612bf7f65, type: 3}
   decorationPrefabs:
   - type: 0
     prefab: {fileID: 8842654137159988500, guid: 5095f2fd5d09b824ca3abe811e246e3f, type: 3}
   capacitorVariants:
-  - {fileID: 7043062803041349706, guid: f83a24d14df23244b8393346d1676868, type: 3}
-  - {fileID: 7043062803041349706, guid: 70d481c5d228655428a938b3f65adab8, type: 3}
-  viaVariants: []
-  startVariants: []
-  goalVariants: []
+  - {fileID: 209706255546499803, guid: 431efd4114e455a4c9326727e93457b3, type: 3}
+  - {fileID: 4715971414759615151, guid: b7c2ded5f1dd3d6459035423c36281a1, type: 3}
+  - {fileID: 1212915362162658301, guid: d226b07cd81abb74f84722df6d930950, type: 3}
+  - {fileID: 6204911755578536120, guid: d6a3121352e82b24aa339e829f06247b, type: 3}
+  - {fileID: 5581391625356901293, guid: 2d5c48bfd99e94c4697ef102271f756d, type: 3}
+  - {fileID: 4689555065821380722, guid: 1fa23e7619abe5a43a46d7a6a4ca9868, type: 3}
+  viaVariants:
+  - {fileID: 8118843376023283083, guid: 667ba4f0f8c23e043bcecc963dcb4587, type: 3}
+  startVariants:
+  - {fileID: 8530263795981424608, guid: 0420f68f0c9ad6c4f984630935589034, type: 3}
+  - {fileID: 4273543922784201026, guid: b81a5a67156859c4e850741ddd1c4cf2, type: 3}
+  - {fileID: 3655323134065229625, guid: d4e119562f3748a41962b09f484d1b8a, type: 3}
+  - {fileID: 4595028126325482037, guid: d662624784e0f5d40ba5157947a2559f, type: 3}
+  goalVariants:
+  - {fileID: 142622263943125105, guid: 5d6e8a74fc502bc4e897acebe391473e, type: 3}
+  - {fileID: 4701758594899651092, guid: 3dc088148d51a964d8f8126dd1c17ec2, type: 3}
+  - {fileID: 512167895461139831, guid: ace300bc893b923499fbeca20d6896e7, type: 3}
+  - {fileID: 1822291219977491971, guid: a2bb2727f72410e49bb1490391b9f3f5, type: 3}
   switchVariants: []
-  gateVariants: []
-  boardTileVariants: []
-  traceVariants: []
-  traceBendVariants: []
+  andSwitchVariants: []
+  gateVariants:
+  - {fileID: 8946151214205948250, guid: 19b0f6b5d7f85aa4bb61e09b1d1bccfe, type: 3}
+  - {fileID: 4036366582128524321, guid: 3c359a3a6c21bfd4e8e717bf3673a8b6, type: 3}
+  boardTileVariants:
+  - {fileID: 1755404028115059004, guid: 80300ef1db8050841bbf439c5200e32e, type: 3}
+  - {fileID: 2460409897440892639, guid: 3f841bf8bbdf88349aeab9d6c6b8f36f, type: 3}
+  - {fileID: 4150448659043484937, guid: 964e6972f03d7fb4ba60e5edc8dfde5c, type: 3}
+  - {fileID: 8720090434053599027, guid: 02d1311ef76d3c54ca54fc84873380e5, type: 3}
+  - {fileID: 6924863077297887296, guid: db6ca5b129e1ac64da229a010900de3c, type: 3}
+  - {fileID: 989500971410953636, guid: 3429614ef51d9614c80cfe52e5440390, type: 3}
+  traceVariants:
+  - {fileID: 1514149792772791552, guid: 651a6812693f1574aae1aa1e60f8d0e8, type: 3}
+  traceBendVariants:
+  - {fileID: 6614226478440039817, guid: 5a5a7775597fc9a4eace200612bf7f65, type: 3}
   background: {r: 0.89411765, g: 0.89411765, b: 0.89411765, a: 1}
   boardThickness: 0.16
   boardMargin: 0.5
@@ -56,6 +83,8 @@ MonoBehaviour:
   viaSize: 0.252
   viaLip: 0.02
   chipHeight: 0.14
+  dataHeight: 0.45
+  goalLockHeight: 0.4
   plugSize: {x: 0.46, y: 0.34, z: 0.26}
   spark: {r: 0.5254902, g: 0.8901961, b: 1, a: 1}
   sparkBlocked: {r: 1, g: 0.3529412, b: 0.3529412, a: 1}

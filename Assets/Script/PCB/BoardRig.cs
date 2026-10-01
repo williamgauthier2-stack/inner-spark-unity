@@ -34,21 +34,32 @@ namespace Pcb
         Vector2 inspect;
         Vector2Int lastScreen;
 
+        [Tooltip("Camera far clip at least this far (0 = just fit the board). Raise it if the room behind the board gets cut off.")]
+        public float minFarClip = 0f;
+        /// <summary>No mouse tilting (e.g. during the stage start sequence).</summary>
+        public bool InspectLocked { get; set; }
+
         public bool IsTurning => flipT < 1f;
         /// <summary>0..1 eased progress of the current turn (1 when not turning).</summary>
         public float TurnProgress => Mathf.SmoothStep(0f, 1f, flipT);
 
-        public static BoardRig Create(Board board, Camera cam)
+        /// <param name="anchor">Optional: the board's centre is placed here (a fixed spot in the room).</param>
+        public static BoardRig Create(Board board, Camera cam, Transform anchor = null, float minFarClip = 0f)
         {
             var go = new GameObject(board.name + " Rig");
             go.transform.position = board.Center;
             board.transform.SetParent(go.transform, true);
+            if (anchor) go.transform.position = anchor.position; // moves the board with it
             var rig = go.AddComponent<BoardRig>();
             rig.board = board;
             rig.cam = cam;
+            rig.minFarClip = minFarClip;
             rig.Frame();
             return rig;
         }
+
+        /// <summary>Puts the camera back in the gameplay view (e.g. after an intro cinematic moved it).</summary>
+        public void Refit() => Frame();
 
         /// <summary>Instantly show a side (level start).</summary>
         public void SnapTo(PcbLayer layer)
@@ -79,14 +90,14 @@ namespace Pcb
             }
 
             var mouse = Mouse.current;
-            if (mouse != null && mouse.leftButton.isPressed && GUIUtility.hotControl == 0 && !PauseMenu.GamePaused)
+            if (mouse != null && mouse.leftButton.isPressed && GUIUtility.hotControl == 0 && !PauseMenu.GamePaused && !InspectLocked)
             {
                 inspect += mouse.delta.ReadValue() * inspectSensitivity;
                 inspect = Vector2.ClampMagnitude(inspect, inspectMaxAngle);
             }
             else inspect = Vector2.Lerp(inspect, Vector2.zero, 1f - Mathf.Exp(-returnSpeed * Time.deltaTime));
 
-            if (lastScreen.x != Screen.width || lastScreen.y != Screen.height) Frame();
+            if ((lastScreen.x != Screen.width || lastScreen.y != Screen.height) && !InspectLocked) Frame(); // not while an intro drives the camera
             Apply();
         }
 
@@ -101,7 +112,9 @@ namespace Pcb
         void Frame()
         {
             lastScreen = new Vector2Int(Screen.width, Screen.height);
-            if (cam && board) FitCamera(cam, board, cameraTilt, fieldOfView, framePadding);
+            if (!cam || !board) return;
+            FitCamera(cam, board, cameraTilt, fieldOfView, framePadding);
+            cam.farClipPlane = Mathf.Max(cam.farClipPlane, minFarClip);
         }
 
         /// <summary>Places a perspective camera in front of the board, tilted up from below, so it all fits.</summary>
